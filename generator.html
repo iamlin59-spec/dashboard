@@ -3,61 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom News Link Generator</title>
-    <!-- Tailwind CSS -->
+    <title>Link Generator with Expiry</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-950 text-white min-h-screen p-6 flex items-center justify-center">
-
-    <div class="max-w-xl w-full bg-gray-900 p-6 rounded-xl shadow-xl border border-gray-800">
-        <h1 class="text-xl font-bold mb-4 text-orange-500">🔗 Custom News Link Generator</h1>
-        <p class="text-sm text-gray-400 mb-6">Enter any news URL below to generate a trackable custom link.</p>
+<body class="bg-gray-950 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-900 p-8 rounded-lg shadow-xl max-w-lg w-full border border-gray-800">
+        <h2 class="text-2xl font-bold mb-6 text-orange-500">Create Tracking Link</h2>
         
-        <!-- ന്യൂസ് ലിങ്ക് എന്റർ ചെയ്യാനുള്ള ബോക്സ് -->
         <div class="mb-4">
-            <label class="block text-sm text-gray-300 mb-2">Target News URL:</label>
-            <input type="text" id="newsUrlInput" placeholder="https://www.manoramaonline.com" 
-                class="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-orange-500">
+            <label class="block text-sm text-gray-400 mb-2">Target URL (News / Video)</label>
+            <input type="text" id="targetUrl" value="https://www.youtube.com/watch?v=eNOxXrElL8Y" class="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white">
         </div>
 
-        <button onclick="generateLink()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold p-3 rounded-lg transition">
-            Generate Link
+        <div class="mb-6">
+            <label class="block text-sm text-gray-400 mb-2">Validity (in Hours)</label>
+            <input type="number" id="expiryHours" value="24" class="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white" placeholder="24">
+        </div>
+
+        <button onclick="generateLink()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded transition">
+            Generate Secure Link
         </button>
 
-        <!-- ജനറേറ്റഡ് ലിങ്ക് കാണിക്കുന്ന സ്ഥലം -->
         <div id="resultBox" class="mt-6 hidden">
-            <label class="block text-sm text-gray-300 mb-2">Your Trackable Link:</label>
-            <div class="flex items-center gap-2">
-                <input type="text" id="generatedLinkOutput" readonly 
-                    class="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-orange-400 text-sm">
-                <button onclick="copyLink()" class="bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg text-sm transition">Copy</button>
-            </div>
+            <label class="block text-sm text-gray-400 mb-2">Generated Link:</label>
+            <input type="text" id="finalLink" readonly class="w-full bg-gray-800 border border-gray-700 rounded p-3 text-orange-300 text-sm mb-3">
+            <button onclick="copyLink()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded transition text-sm">
+                Copy Link
+            </button>
         </div>
     </div>
 
     <script>
         function generateLink() {
-            let urlInput = document.getElementById('newsUrlInput').value.trim();
-            if (!urlInput) {
-                alert("Please enter a valid news URL!");
-                return;
-            }
-
-            // നിലവിലെ വെബ്‌സൈറ്റ് പാത്തിൽ നിന്ന് news.html ലേക്കുള്ള ലിങ്ക് ഉണ്ടാക്കുന്നു
-            let baseUrl = window.location.origin + window.location.pathname.replace("generator.html", "") + "news.html";
+            const target = document.getElementById('targetUrl').value;
+            const hours = parseInt(document.getElementById('expiryHours').value) || 24;
             
-            // യൂസർ നൽകിയ ലിങ്ക് പാരാമീറ്ററായി ചേർക്കുന്നു
-            let finalLink = baseUrl + "?target=" + encodeURIComponent(urlInput);
-
-            document.getElementById('generatedLinkOutput').value = finalLink;
+            // Calculate expiry timestamp (Current time + hours in milliseconds)
+            const expiryTime = Date.now() + (hours * 60 * 60 * 1000);
+            
+            const baseUrl = window.location.origin + window.location.pathname.replace('generator.html', 'news.html');
+            const encodedTarget = encodeURIComponent(target);
+            
+            const finalUrl = `${baseUrl}?target=${encodedTarget}&exp=${expiryTime}`;
+            
+            document.getElementById('finalLink').value = finalUrl;
             document.getElementById('resultBox').classList.remove('hidden');
         }
 
         function copyLink() {
-            let copyText = document.getElementById('generatedLinkOutput');
+            const copyText = document.getElementById('finalLink');
             copyText.select();
-            document.execCommand("copy");
-            alert("Link copied to clipboard!");
+            document.execCommand('copy');
+            alert('Link copied to clipboard!');
         }
     </script>
 </body>
