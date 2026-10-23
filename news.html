@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Breaking News - Loading...</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK v10 Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
@@ -25,13 +26,15 @@
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
+        // നിങ്ങളുടെ ഒറിജിനൽ ഫയർബേസ് കോൺഫിഗറേഷൻ
         const firebaseConfig = {
-            apiKey: "AIzaSyBj20CcchbNqzUmiQo7gVcFvEgCXT_-AA4",
+            apiKey: "AIzaSyBj2OCcchbNqzUmiQo7gVcFvEGcXT_-AA4",
             authDomain: "calculatorapp-44d90.firebaseapp.com",
             projectId: "calculatorapp-44d90",
-            storageBucket: "calculatorapp-44d90.appspot.com",
+            storageBucket: "calculatorapp-44d90.firebasestorage.app",
             messagingSenderId: "659953474145",
-            appId: "1:659953474145:web:2fef467a200ee091d9a820"
+            appId: "1:659953474145:web:2fef467a200ee091d9a820",
+            measurementId: "G-9GN8DFH3L0"
         };
 
         if (!firebase.apps.length) {
